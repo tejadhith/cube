@@ -10,7 +10,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 _data: dict = {}
 _lock = threading.Lock()
 
-FACE_ORDER = ("U", "D", "F", "B", "L", "R")
+FACE_ORDER = ("U", "R", "F", "D", "L", "B")
 
 COLOR_INDEX = {"W": 10, "Y": 11, "O": 12, "R": 13, "G": 14, "B": 15}
 
@@ -99,8 +99,8 @@ _HTML = r"""<!DOCTYPE html>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, system-ui, 'Segoe UI', Helvetica, Arial, sans-serif;
-    background: #fff;
-    color: #333;
+    background: #000;
+    color: #ccc;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -116,49 +116,93 @@ _HTML = r"""<!DOCTYPE html>
     margin-bottom: 16px;
   }
   #cube {
-    width: min(70vmin, calc(100vh - 180px));
-    height: min(70vmin, calc(100vh - 180px));
+    width: min(60vmin, calc(100vh - 300px));
+    height: min(60vmin, calc(100vh - 300px));
     transition: opacity 0.18s ease;
   }
 
+  #vp-label {
+    margin-top: 14px;
+    font-size: 11px;
+    color: #aaa;
+    letter-spacing: 0.5px;
+  }
+  #vp-label span { color: #ddd; font-weight: 600; }
+
+  #vp-net {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(4, 16px);
+    grid-template-rows: repeat(3, 16px);
+    gap: 2px;
+    justify-content: center;
+  }
+  .net-cell {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: opacity 0.25s ease;
+  }
+  .net-cell.dim { opacity: 0.15; }
+
   #stats {
-    margin-top: 16px;
+    margin-top: 14px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 4px 24px;
     font-size: 12px;
   }
-  .stat-label { color: #999; }
-  .stat-value { text-align: right; font-weight: 600; }
-  .stat-value.solved { color: #2a2; }
-  .stat-value.unsolved { color: #c44; }
-
-  #visible-bar {
-    margin-top: 12px;
-    font-size: 11px;
-    text-align: center;
-    color: #999;
+  .stat-label { color: #777; }
+  .stat-value {
+    text-align: right;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
   }
-  #visible-bar span { color: #555; font-weight: 600; }
+
+  #history {
+    margin-top: 12px;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+    min-height: 22px;
+  }
+  .move-pill {
+    background: #2a2a2a;
+    color: #bbb;
+    font-size: 11px;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    animation: pillIn 0.2s ease;
+  }
+  @keyframes pillIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
   #pip-btn {
     margin-top: 16px;
-    background: #f5f5f5;
+    background: transparent;
     color: #666;
-    border: 1px solid #ddd;
+    border: 1px solid #333;
     border-radius: 6px;
     padding: 6px 16px;
-    font-size: 12px;
+    font-size: 11px;
     font-family: inherit;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: all 0.15s;
   }
-  #pip-btn:hover { background: #eee; color: #333; }
+  #pip-btn:hover { background: #222; color: #aaa; border-color: #555; }
 
-  body.pip { padding: 0; justify-content: center; }
+  body.pip { padding: 0; justify-content: center; background: #000; }
   body.pip h1,
+  body.pip #vp-label,
+  body.pip #vp-net,
   body.pip #stats,
-  body.pip #visible-bar,
+  body.pip #history,
   body.pip #pip-btn { display: none; }
   body.pip #cube { width: 100vw; height: 100vh; }
 </style>
@@ -166,13 +210,13 @@ _HTML = r"""<!DOCTYPE html>
 <body>
 <h1>Rubik's Cube POMDP</h1>
 <div id="cube"></div>
-<div id="visible-bar">Viewpoint: <span id="vp">-</span> &middot; Visible: <span id="vis">-</span></div>
+<div id="vp-label"><span id="vp">-</span></div>
+<div id="vp-net"></div>
 <div id="stats">
   <div class="stat-label">Moves</div><div class="stat-value" id="s-moves">0</div>
   <div class="stat-label">Inspections</div><div class="stat-value" id="s-insp">0</div>
-  <div class="stat-label">Total steps</div><div class="stat-value" id="s-total">0</div>
-  <div class="stat-label">Solved</div><div class="stat-value" id="s-solved">-</div>
 </div>
+<div id="history"></div>
 <button id="pip-btn">Pop Out</button>
 
 <script src="https://animcubejs.cubing.net/AnimCube3.js"></script>
@@ -185,7 +229,7 @@ var acjs_paint = [];
 var acjs_put_var = [];
 var acjs_startAnimation = [];
 
-const INIT_FACELETS = 'wwwwwwwwwyyyyyyyyyggggggggbbbbbbbbbooooooooorrrrrrrrrr';
+const INIT_FACELETS = 'wwwwwwwwwrrrrrrrrrgggggggggyyyyyyyyyooooooooobbbbbbbbb';
 const MAP = {w:10, y:11, o:12, r:13, g:14, b:15};
 
 const POSITIONS = {
@@ -199,10 +243,14 @@ const POSITIONS = {
   7: 'llllllddff'
 };
 
+const FACE_COLORS = {U:'#ffffff',D:'#fdd835',F:'#43a047',B:'#1e88e5',L:'#fb8c00',R:'#e53935'};
+const NET = [null,'U',null,null,'L','F','R','B',null,'D',null,null];
+
 let lastTs = 0;
 let viewId = -1;
 let lastFl = INIT_FACELETS;
 let busy = false;
+let moveHistory = [];
 
 function curPos() { return POSITIONS[viewId] || POSITIONS[0]; }
 
@@ -213,7 +261,7 @@ function buildCube(fl, position, move) {
   acjs_paint = [];
   acjs_put_var = [];
   acjs_startAnimation = [];
-  let cfg = 'id=cube&facelets=' + fl + '&buttonbar=0&edit=0&borderwidth=2&hint=0&bgcolor=ffffff&cubecolor=333333&position=' + position;
+  let cfg = 'id=cube&facelets=' + fl + '&buttonbar=0&edit=0&borderwidth=2&hint=0&bgcolor=000000&cubecolor=333333&position=' + position;
   if (move) cfg += '&move=' + move + '&speed=12';
   AnimCube3(cfg);
 }
@@ -249,19 +297,42 @@ function setCube(fl) {
   acjs_paint['cube']();
 }
 
+function renderNet(visible) {
+  const vis = new Set(visible || []);
+  const el = document.getElementById('vp-net');
+  el.innerHTML = '';
+  for (const face of NET) {
+    const cell = document.createElement('div');
+    if (face) {
+      cell.className = 'net-cell' + (vis.has(face) ? '' : ' dim');
+      cell.style.background = FACE_COLORS[face];
+    }
+    el.appendChild(cell);
+  }
+}
+
+function renderHistory() {
+  const el = document.getElementById('history');
+  el.innerHTML = '';
+  for (const m of moveHistory) {
+    const pill = document.createElement('span');
+    pill.className = 'move-pill';
+    pill.textContent = m;
+    el.appendChild(pill);
+  }
+}
+
 function updateStats(d) {
   const s = d.stats || {};
   document.getElementById('s-moves').textContent = s.moves ?? '-';
   document.getElementById('s-insp').textContent = s.inspections ?? '-';
-  document.getElementById('s-total').textContent = s.total ?? '-';
-  const el = document.getElementById('s-solved');
-  el.textContent = s.solved ? 'Yes' : 'No';
-  el.className = 'stat-value ' + (s.solved ? 'solved' : 'unsolved');
-  document.getElementById('vp').textContent = d.viewpoint || '-';
-  document.getElementById('vis').textContent = (d.visible || []).join(', ');
+  const vp = d.viewpoint || '-';
+  document.getElementById('vp').textContent = vp === '-' ? vp : vp.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  renderNet(d.visible);
 }
 
 buildCube(INIT_FACELETS, POSITIONS[0]);
+renderNet([]);
 
 async function poll() {
   try {
@@ -273,6 +344,16 @@ async function poll() {
       const prevFl = lastFl;
       lastFl = fl;
       const vid = d.viewpoint_id;
+      const s = d.stats || {};
+
+      if ((s.moves ?? 0) === 0 && moveHistory.length > 0) {
+        moveHistory = [];
+        renderHistory();
+      } else if (d.move) {
+        moveHistory.push(d.move);
+        if (moveHistory.length > 8) moveHistory.shift();
+        renderHistory();
+      }
 
       if (vid !== undefined && vid !== viewId) {
         viewId = vid;
@@ -291,83 +372,53 @@ setInterval(poll, 400);
 setTimeout(poll, 200);
 
 document.getElementById('pip-btn').addEventListener('click', async () => {
-  if ('documentPictureInPicture' in window) {
-    try {
-      const pip = await documentPictureInPicture.requestWindow({width: 300, height: 300});
-      pip.document.head.innerHTML = '<style>' +
-        document.querySelector('style').textContent + '</style>';
-      pip.document.body.className = 'pip';
-      pip.document.body.innerHTML = '<div id="cube" style="width:100%;height:100%;transition:opacity .18s ease"></div>';
-
-      const script1 = pip.document.createElement('script');
-      script1.src = 'https://animcubejs.cubing.net/AnimCube3.js';
-      script1.onload = () => {
-        const script2 = pip.document.createElement('script');
-        script2.textContent = `
-          var acjs_cube = [];
-          var acjs_paint = [];
-          var acjs_put_var = [];
-          var acjs_startAnimation = [];
-          var MAP = {w:10,y:11,o:12,r:13,g:14,b:15};
-          var POSITIONS = {0:'lluuff',1:'rruuff',2:'rrrrrruuff',3:'lllllluuff',4:'llddff',5:'rrddff',6:'rrrrrrddff',7:'llllllddff'};
-          var viewId = -1;
-          var lastTs = 0;
-          var lastFl = '${INIT_FACELETS}';
-          var busy = false;
-          function curPos() { return POSITIONS[viewId] || POSITIONS[0]; }
-          function buildCube(fl, pos, mv) {
-            var el = document.getElementById('cube');
-            el.innerHTML = '';
-            acjs_cube = [];
-            acjs_paint = [];
-            acjs_put_var = [];
-            acjs_startAnimation = [];
-            var cfg = 'id=cube&facelets=' + fl + '&buttonbar=0&edit=0&borderwidth=2&hint=0&bgcolor=ffffff&cubecolor=333333&position=' + pos;
-            if (mv) cfg += '&move=' + mv + '&speed=12';
-            AnimCube3(cfg);
-          }
-          function transitionCube(fl, pos) {
-            var el = document.getElementById('cube');
-            busy = true;
-            el.style.opacity = '0';
-            setTimeout(function() { buildCube(fl, pos); el.style.opacity = '1'; busy = false; }, 200);
-          }
-          function animateMove(preFl, pos, mv, postFl) {
-            busy = true;
-            buildCube(preFl, pos, mv);
-            setTimeout(function() { if (acjs_startAnimation['cube']) acjs_startAnimation['cube'](2); }, 60);
-            setTimeout(function() { busy = false; }, 700);
-          }
-          function setCube(fl) {
-            if (busy || !acjs_cube['cube']) return;
-            for (var f=0;f<6;f++) for (var j=0;j<9;j++) acjs_cube['cube'][f][j]=MAP[fl[f*9+j]]||10;
-            acjs_paint['cube']();
-          }
-          buildCube(lastFl, POSITIONS[0]);
-          setInterval(async function(){
-            try {
-              var r = await fetch('/state');
-              var d = await r.json();
-              if (d.ts && d.ts !== lastTs) {
-                lastTs = d.ts;
-                var fl = d.facelets || lastFl;
-                var prevFl = lastFl;
-                lastFl = fl;
-                var vid = d.viewpoint_id;
-                if (vid !== undefined && vid !== viewId) { viewId = vid; transitionCube(fl, POSITIONS[vid] || POSITIONS[0]); }
-                else if (d.move && !busy) { animateMove(prevFl, curPos(), d.move, fl); }
-                else if (!busy) { setCube(fl); }
-              }
-            } catch(e) {}
-          }, 400);
-        `;
-        pip.document.body.appendChild(script2);
-      };
-      pip.document.head.appendChild(script1);
-      return;
-    } catch (e) { /* fall through to popup */ }
+  function popup() {
+    window.open('/?pip=1', 'cube-pip', 'width=300,height=300,menubar=no,toolbar=no,location=no');
   }
-  window.open('/?pip=1', 'cube-pip', 'width=300,height=300,menubar=no,toolbar=no,location=no');
+  if (!('pictureInPictureEnabled' in document) || !document.pictureInPictureEnabled) {
+    popup();
+    return;
+  }
+  const src = document.querySelector('#cube canvas');
+  if (!src) return;
+
+  const pipCanvas = document.createElement('canvas');
+  pipCanvas.width = src.width;
+  pipCanvas.height = src.height;
+  const ctx = pipCanvas.getContext('2d');
+  ctx.drawImage(src, 0, 0);
+
+  const stream = pipCanvas.captureStream(30);
+  const video = document.createElement('video');
+  video.srcObject = stream;
+  video.muted = true;
+  video.playsInline = true;
+  video.style.display = 'none';
+  document.body.appendChild(video);
+  await video.play();
+
+  let active = true;
+  function stop() {
+    active = false;
+    stream.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+    video.remove();
+  }
+  function copyFrame() {
+    if (!active) return;
+    const s = document.querySelector('#cube canvas');
+    if (s) ctx.drawImage(s, 0, 0, pipCanvas.width, pipCanvas.height);
+    requestAnimationFrame(copyFrame);
+  }
+
+  try {
+    await video.requestPictureInPicture();
+    copyFrame();
+    video.addEventListener('leavepictureinpicture', stop);
+  } catch (e) {
+    stop();
+    popup();
+  }
 });
 
 </script>

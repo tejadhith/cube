@@ -169,3 +169,10 @@ async def get_stats() -> dict:
 def main():
     live.start()
     mcp.run()
+
+
+def dev():
+    mcp.settings.host = "0.0.0.0"
+    mcp.settings.port = 4321
+    live.start(port=4322)
+    mcp.run(transport="sse")
