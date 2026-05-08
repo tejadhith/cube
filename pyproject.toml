@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cube-mcp"
+name = "twisty"
 version = "0.1.0"
-description = "Partially-observable Rubik cube POMDP MCP server"
+description = "Partially-observable twisty puzzle environment as MCP tools"
 requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]>=1.26.0",
