@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "twisty"
-version = "0.1.5"
+version = "0.1.6"
 description = "Solve a cube under partial observability via MCP"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,5 +21,7 @@ dev = ["pytest>=8.0.0"]
 twisty = "cube.server:main"
 
 [tool.setuptools]
-include-package-data = true
 packages = ["cube"]
+
+[tool.setuptools.package-data]
+cube = ["twisty.bundle.js"]
