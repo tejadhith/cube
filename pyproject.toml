@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "twisty"
-version = "0.1.3"
-description = "Partially-observable twisty puzzle environment as MCP tools"
+version = "0.1.4"
+description = "Solve a cube under partial observability via MCP"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
