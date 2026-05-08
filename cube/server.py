@@ -5,10 +5,12 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP, Image
 
-from cube import live, log
+from cube import live
 from cube.render import render
 from cube.state import State
 from cube.view import Viewpoint
+
+_ARROWS = {"left": "←", "right": "→", "up": "↑", "down": "↓"}
 
 mcp = FastMCP(
     "Rubik Cube POMDP",
@@ -30,16 +32,10 @@ _view = Viewpoint(0)
 _lock = asyncio.Lock()
 
 
-def _log_result(result) -> str:
-    if isinstance(result, list):
-        return "\n".join(str(r) for r in result if not isinstance(r, Image))
-    return str(result)
-
-
-def _observe(move=None) -> tuple[list, bytes]:
+def _observe(move=None, event: dict | None = None) -> tuple[list, bytes]:
     visible = set(_view.faces)
     all_faces = _state.faces
-    img = render(all_faces, visible, label=_view.name)
+    img = render(all_faces, visible)
 
     lines = [f"Viewpoint: {_view.name} (id={_view.id})"]
     lines.append(f"Visible faces: {', '.join(sorted(visible))}")
@@ -54,22 +50,23 @@ def _observe(move=None) -> tuple[list, bytes]:
     lines.append("")
     lines.append(f"Solved: {_state.solved}")
 
-    live.update(_state.faces, _view, _state.stats, move=move)
+    live.update(_state.faces, _view, _state.stats, move=move, event=event,
+                scramble_alg=_state.scramble_alg, alg=_state.alg)
 
     return [Image(data=img, format="png"), "\n".join(lines)], img
 
 
 @mcp.tool()
 async def scramble(num_moves: int = 20) -> list:
-    """Scramble the cube with random moves to start a new puzzle. Resets camera to front-right-top."""
+    """Scramble the cube with random moves to start a new puzzle. Resets camera to Front-Right-Top."""
     async with _lock:
         global _state, _view
         _state = State()
         moves = _state.scramble(num_moves)
         _view = Viewpoint(0)
-        result, img = _observe()
+        live.clear()
+        result, img = _observe(event={"tool": "scramble", "display": f"scramble({num_moves})"})
         result.append(f"\nScrambled with {num_moves} random moves. Use look and rotate_view to explore the cube state.")
-        log.call("scramble", {"num_moves": num_moves}, _log_result(result), img)
         return result
 
 
@@ -80,8 +77,8 @@ async def reset() -> list:
         global _state, _view
         _state = State()
         _view = Viewpoint(0)
-        result, img = _observe()
-        log.call("reset", {}, _log_result(result), img)
+        live.clear()
+        result, img = _observe(event={"tool": "reset", "display": "reset()"})
         return result
 
 
@@ -89,8 +86,7 @@ async def reset() -> list:
 async def look() -> list:
     """Get the current view. Free action (no step cost)."""
     async with _lock:
-        result, img = _observe()
-        log.call("look", {}, _log_result(result), img)
+        result, img = _observe(event={"tool": "look", "display": "look()"})
         return result
 
 
@@ -107,12 +103,12 @@ async def rotate_view(direction: Literal["left", "right", "up", "down"]) -> list
         _view = _view.rotate(direction)
         _state.tick_inspection()
 
-        result, img = _observe()
+        arrow = _ARROWS.get(direction, direction)
+        result, img = _observe(event={"tool": "rotate_view", "display": f"rotate_view({arrow})"})
         if old == _view:
             result.append(f"\nNote: already at boundary, viewpoint unchanged (still {_view.name}).")
         else:
-            result.append(f"\nRotated {direction}: {old.name} -> {_view.name}")
-        log.call("rotate_view", {"direction": direction}, _log_result(result), img)
+            result.append(f"\nRotated {arrow}: {old.name} → {_view.name}")
         return result
 
 
@@ -127,14 +123,14 @@ async def move(notation: str) -> list:
         try:
             _state.apply(notation)
         except ValueError as e:
-            err = str(e)
-            log.call("move", {"notation": notation}, f"ERROR: {err}")
-            return [err]
-        result, img = _observe(move=notation)
+            return [str(e)]
+        result, img = _observe(
+            move=notation,
+            event={"tool": "move", "display": f"move({notation})"},
+        )
         result.append(f"\nApplied: {notation}")
         if _state.solved:
             result.append("CONGRATULATIONS! The cube is solved!")
-        log.call("move", {"notation": notation}, _log_result(result), img)
         return result
 
 
@@ -143,7 +139,7 @@ async def is_solved() -> bool:
     """Check if the cube is solved. Free action."""
     async with _lock:
         result = _state.solved
-        log.call("is_solved", {}, str(result))
+        live.push({"tool": "is_solved", "display": f"is_solved() → {str(result).lower()}"})
         return result
 
 
@@ -153,7 +149,7 @@ async def get_history() -> str:
     async with _lock:
         moves = _state.history
         result = " ".join(moves) if moves else "No moves applied yet."
-        log.call("get_history", {}, result)
+        live.push({"tool": "get_history", "display": f"get_history() → {len(moves)} moves"})
         return result
 
 
@@ -162,7 +158,7 @@ async def get_stats() -> dict:
     """Get performance statistics: moves, inspections, total steps, scramble size, solved status."""
     async with _lock:
         result = _state.stats
-        log.call("get_stats", {}, str(result))
+        live.push({"tool": "get_stats", "display": "get_stats()"})
         return result
 
 
@@ -171,8 +167,3 @@ def main():
     mcp.run()
 
 
-def dev():
-    mcp.settings.host = "0.0.0.0"
-    mcp.settings.port = 4321
-    live.start(port=4322)
-    mcp.run(transport="sse")

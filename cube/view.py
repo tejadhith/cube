@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 POINTS = (
-    {"id": 0, "name": "front-right-top",    "azim": 45,  "elev": 30,  "faces": ("F", "R", "U")},
-    {"id": 1, "name": "front-left-top",     "azim": 315, "elev": 30,  "faces": ("F", "L", "U")},
-    {"id": 2, "name": "back-left-top",      "azim": 225, "elev": 30,  "faces": ("B", "L", "U")},
-    {"id": 3, "name": "back-right-top",     "azim": 135, "elev": 30,  "faces": ("B", "R", "U")},
-    {"id": 4, "name": "front-right-bottom", "azim": 45,  "elev": -30, "faces": ("F", "R", "D")},
-    {"id": 5, "name": "front-left-bottom",  "azim": 315, "elev": -30, "faces": ("F", "L", "D")},
-    {"id": 6, "name": "back-left-bottom",   "azim": 225, "elev": -30, "faces": ("B", "L", "D")},
-    {"id": 7, "name": "back-right-bottom",  "azim": 135, "elev": -30, "faces": ("B", "R", "D")},
+    {"id": 0, "name": "Front-Right-Top",    "azim": 45,  "elev": 30,  "faces": ("F", "R", "U")},
+    {"id": 1, "name": "Front-Left-Top",     "azim": 315, "elev": 30,  "faces": ("F", "L", "U")},
+    {"id": 2, "name": "Back-Left-Top",      "azim": 225, "elev": 30,  "faces": ("B", "L", "U")},
+    {"id": 3, "name": "Back-Right-Top",     "azim": 135, "elev": 30,  "faces": ("B", "R", "U")},
+    {"id": 4, "name": "Front-Right-Bottom", "azim": 45,  "elev": -30, "faces": ("F", "R", "D")},
+    {"id": 5, "name": "Front-Left-Bottom",  "azim": 315, "elev": -30, "faces": ("F", "L", "D")},
+    {"id": 6, "name": "Back-Left-Bottom",   "azim": 225, "elev": -30, "faces": ("B", "L", "D")},
+    {"id": 7, "name": "Back-Right-Bottom",  "azim": 135, "elev": -30, "faces": ("B", "R", "D")},
 )
 
 TRANSITIONS: dict[tuple[int, str], int] = {

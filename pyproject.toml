@@ -18,7 +18,6 @@ dev = ["pytest>=8.0.0"]
 
 [project.scripts]
 cube-server = "cube.server:main"
-cube-dev = "cube.server:dev"
 
 [tool.setuptools]
 include-package-data = true

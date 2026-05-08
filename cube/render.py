@@ -16,7 +16,6 @@ COLORS: dict[str, tuple[int, int, int]] = {
 HIDDEN = (80, 80, 80)
 BG = (30, 30, 30)
 BORDER = (0, 0, 0)
-LABEL = (180, 180, 180)
 
 NET: dict[str, tuple[int, int]] = {
     "U": (1, 0),
@@ -29,43 +28,46 @@ NET: dict[str, tuple[int, int]] = {
 
 ALL_FACES = ("U", "L", "F", "R", "B", "D")
 
+HATCH_STEP = 12
+HATCH_COLOR = (92, 92, 92)
+PILL_RADIUS = 5
+
+
+def _pill(w: int, h: int, fill: tuple[int, int, int, int]) -> Image.Image:
+    pill = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(pill).rounded_rectangle(
+        [0, 0, w - 1, h - 1], radius=PILL_RADIUS, fill=fill,
+    )
+    return pill
+
 
 def render(
     faces: dict[str, list[list[str]]],
     visible: set[str],
-    label: str = "",
-    cell: int = 30,
+    cell: int = 48,
 ) -> bytes:
     n = 3
-    pad = 12
-    gap = 2
+    pad = 14
+    gap = 3
     face_px = n * cell + (n + 1) * gap
-    header = 24
 
     w = 4 * face_px + 2 * pad
-    h = 3 * face_px + 2 * pad + header
+    h = 3 * face_px + 2 * pad
 
     img = Image.new("RGB", (w, h), BG)
     draw = ImageDraw.Draw(img)
 
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 11)
-        small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 10)
+        font = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 20,
+        )
     except OSError:
         font = ImageFont.load_default()
-        small = font
-
-    vis = sorted(visible)
-    hid = sorted(set(ALL_FACES) - visible)
-    title = f"{label}  |  Visible: {' '.join(vis)}  |  Hidden: {' '.join(hid)}"
-    draw.text((pad, 4), title, fill=LABEL, font=font)
-
-    top = pad + header
 
     for name in ALL_FACES:
         col, row = NET[name]
         ox = pad + col * face_px
-        oy = top + row * face_px
+        oy = pad + row * face_px
 
         if name in visible and name in faces:
             grid = faces[name]
@@ -78,18 +80,34 @@ def render(
                         [x0, y0, x0 + cell - 1, y0 + cell - 1],
                         fill=color, outline=BORDER, width=1,
                     )
-        else:
-            draw.rectangle(
-                [ox + gap, oy + gap, ox + face_px - gap, oy + face_px - gap],
-                fill=HIDDEN, outline=(60, 60, 60), width=1,
-            )
 
-        lx = ox + face_px // 2
-        ly = oy + face_px // 2
-        if name not in visible:
-            draw.text((lx - 4, ly - 6), name, fill=(120, 120, 120), font=small)
+            cx = ox + gap + (cell + gap) + cell // 2
+            cy = oy + gap + (cell + gap) + cell // 2
+            bb = font.getbbox(name)
+            tw, th = bb[2] - bb[0], bb[3] - bb[1]
+            pp = 6
+            pill = _pill(tw + pp * 2, th + pp * 2, (0, 0, 0, 140))
+            img.paste(pill, (cx - pill.width // 2, cy - pill.height // 2), pill)
+            draw.text((cx, cy), name, fill=(255, 255, 255), font=font, anchor="mm")
         else:
-            draw.text((ox + gap + 1, oy + gap + 1), name, fill=(40, 40, 40), font=small)
+            fx, fy = ox + gap, oy + gap
+            fw, fh = face_px - 2 * gap, face_px - 2 * gap
+
+            tile = Image.new("RGB", (fw, fh), HIDDEN)
+            td = ImageDraw.Draw(tile)
+            for off in range(-fh, fw + fh, HATCH_STEP):
+                td.line([(off, 0), (off + fh, fh)], fill=HATCH_COLOR, width=1)
+            td.rectangle([0, 0, fw - 1, fh - 1], outline=(60, 60, 60), width=1)
+            img.paste(tile, (fx, fy))
+
+            cx = ox + face_px // 2
+            cy = oy + face_px // 2
+            bb = font.getbbox(name)
+            tw, th = bb[2] - bb[0], bb[3] - bb[1]
+            pp = 7
+            pill = _pill(tw + pp * 2, th + pp * 2, (60, 60, 60, 210))
+            img.paste(pill, (cx - pill.width // 2, cy - pill.height // 2), pill)
+            draw.text((cx, cy), name, fill=(140, 140, 140), font=font, anchor="mm")
 
     buf = BytesIO()
     img.save(buf, format="PNG")

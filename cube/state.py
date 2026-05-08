@@ -21,6 +21,7 @@ class State:
     def __init__(self) -> None:
         self._cube = magiccube.Cube(3)
         self._log: list[str] = []
+        self._scramble_log: list[str] = []
         self._moves = 0
         self._inspections = 0
         self._scrambled = 0
@@ -29,6 +30,7 @@ class State:
         self._cube.reset()
         self._cube.scramble(num_steps=n)
         moves = [str(m) for m in self._cube.history()]
+        self._scramble_log = moves
         self._log = []
         self._moves = 0
         self._inspections = 0
@@ -37,6 +39,7 @@ class State:
 
     def reset(self) -> None:
         self._cube.reset()
+        self._scramble_log = []
         self._log = []
         self._moves = 0
         self._inspections = 0
@@ -74,6 +77,14 @@ class State:
     @property
     def history(self) -> list[str]:
         return list(self._log)
+
+    @property
+    def scramble_alg(self) -> str:
+        return " ".join(self._scramble_log)
+
+    @property
+    def alg(self) -> str:
+        return " ".join(self._log)
 
     @property
     def stats(self) -> dict:
