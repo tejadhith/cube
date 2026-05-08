@@ -4,7 +4,7 @@ A partially-observable twisty puzzle environment exposed as [MCP](https://modelc
 
 The cube is fixed in space. From any viewpoint you see exactly 3 of 6 faces — the other 3 are hidden. Rotate the camera to reveal new faces, apply moves to solve, and try to minimize total steps.
 
-![Cube net render showing visible and hidden faces](assets/overview.png)
+![Cube net render showing visible and hidden faces](https://raw.githubusercontent.com/tejadhith/cube/master/assets/overview.png)
 
 ## Quick start
 
@@ -64,7 +64,7 @@ Each tool call returns a net render of the cube — visible faces in color, hidd
 
 | Front-Right-Top | Front-Left-Top | Front-Right-Bottom |
 |:---:|:---:|:---:|
-| ![FRT viewpoint](assets/front.png) | ![FLT viewpoint](assets/left.png) | ![FRB viewpoint](assets/bottom.png) |
+| ![FRT viewpoint](https://raw.githubusercontent.com/tejadhith/cube/master/assets/front.png) | ![FLT viewpoint](https://raw.githubusercontent.com/tejadhith/cube/master/assets/left.png) | ![FRB viewpoint](https://raw.githubusercontent.com/tejadhith/cube/master/assets/bottom.png) |
 | Sees F, R, U | Sees F, L, U | Sees F, R, D |
 
 ## Live viewer
