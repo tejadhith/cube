@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Literal
 
-from mcp.server.fastmcp import FastMCP, Image
+from mcp.server.fastmcp import FastMCP, Image, ToolError
 
 from cube import live
 from cube.render import render
@@ -123,7 +123,7 @@ async def move(notation: str) -> list:
         try:
             _state.apply(notation)
         except ValueError as e:
-            return [str(e)]
+            raise ToolError(str(e))
         result, img = _observe(
             move=notation,
             event={"tool": "move", "display": f"move({notation})"},
